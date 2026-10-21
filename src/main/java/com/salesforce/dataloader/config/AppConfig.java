@@ -298,6 +298,11 @@ public class AppConfig {
     public static final String PROP_SELECTED_SERVER_ENVIRONMENT = OAUTH_PREFIX + "environment";
     public static final String PROP_OAUTH_ACCESSTOKEN = OAUTH_PREFIX + "accesstoken";
     public static final String PROP_OAUTH_REFRESHTOKEN = OAUTH_PREFIX + "refreshtoken";
+    // JWT Bearer (RFC 7523) login for headless batch runs: the key file's presence turns the mode on
+    public static final String PROP_OAUTH_JWT_KEYFILE = OAUTH_PREFIX + "jwt.keyfile";
+    public static final String PROP_OAUTH_JWT_KEYPASSWORD = OAUTH_PREFIX + "jwt.keypassword";
+    public static final String PROP_OAUTH_JWT_CLIENTID = OAUTH_PREFIX + "jwt.clientid";
+    public static final String PROP_OAUTH_JWT_AUDIENCE = OAUTH_PREFIX + "jwt.audience";
     public static final String PROP_OAUTH_PKCE_PORT = OAUTH_PREFIX + "pkce.port";
     public static final String PROP_CLIENTID_PROD_PARTNER = OAUTH_PREFIX 
             + SERVER_PROD_ENVIRONMENT_VAL 
@@ -539,6 +544,7 @@ public class AppConfig {
             PROP_DELETE_WITH_EXTERNALID,
             PROP_OAUTH_ACCESSTOKEN,
             PROP_OAUTH_REFRESHTOKEN,
+            PROP_OAUTH_JWT_KEYPASSWORD,
             PROP_OAUTH_INSTANCE_URL,
             PROP_OAUTH_REDIRECT_URI_PROD,
             PROP_OAUTH_REDIRECT_URI_SB,
@@ -602,6 +608,7 @@ public class AppConfig {
             PROP_PROXY_PASSWORD,
             PROP_OAUTH_ACCESSTOKEN,
             PROP_OAUTH_REFRESHTOKEN,
+            PROP_OAUTH_JWT_KEYPASSWORD,
             PROP_OAUTH_CLIENTSECRET_PROD,
             PROP_OAUTH_CLIENTSECRET_SB,
             PROP_ECA_CLIENT_SECRET_PROD,
