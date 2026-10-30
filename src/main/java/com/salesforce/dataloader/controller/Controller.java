@@ -41,6 +41,8 @@ import com.salesforce.dataloader.config.AppConfig;
 import com.salesforce.dataloader.config.Messages;
 import com.salesforce.dataloader.dao.DataAccessObjectInterface;
 import com.salesforce.dataloader.dao.DataAccessObjectFactory;
+import com.salesforce.dataloader.oauth.jwt.JwtBearerException;
+import com.salesforce.dataloader.oauth.jwt.JwtBearerLogin;
 import com.salesforce.dataloader.exception.ConfigInitializationException;
 import com.salesforce.dataloader.exception.ControllerInitializationException;
 import com.salesforce.dataloader.exception.DataAccessObjectException;
@@ -275,6 +277,16 @@ public class Controller {
 
     public boolean isLoggedIn() {
         return getLoginClient().isLoggedIn();
+    }
+
+    /**
+     * Mints a new access token with JWT Bearer and reconnects the login client and the active API client with it.
+     * Bulk connections take the session id once, so they have to be rebuilt as well.
+     */
+    public void renewJwtSession() throws JwtBearerException, ConnectionException {
+        JwtBearerLogin.forConfig(appConfig).authenticate();
+        getLoginClient().connect();
+        getClient().connect(getLoginClient().getSession());
     }
 
     private void createDao(String daoTypeStr, String daoNameStr) throws DataAccessObjectInitializationException {

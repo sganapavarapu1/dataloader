@@ -50,9 +50,12 @@ import com.salesforce.dataloader.exception.LoadExceptionOnServer;
 import com.salesforce.dataloader.exception.MappingInitializationException;
 import com.salesforce.dataloader.exception.OperationException;
 import com.salesforce.dataloader.exception.ParameterLoadException;
+import com.salesforce.dataloader.oauth.jwt.JwtBearerLogin;
 import com.salesforce.dataloader.util.AppUtil;
 import com.sforce.async.AsyncApiException;
+import com.sforce.async.AsyncExceptionCode;
 import com.sforce.soap.partner.fault.ApiFault;
+import com.sforce.soap.partner.fault.ExceptionCode;
 import com.sforce.ws.ConnectionException;
 
 /**
@@ -209,7 +212,54 @@ abstract class AbstractAction implements IAction {
         return exceptions;
     }
     
+    /** @return true if the exception, or anything in its cause chain, reports an expired or invalid session */
+    static boolean isSessionExpired(Throwable t) {
+        for (Throwable cur = t; cur != null; cur = cur.getCause()) {
+            if (cur instanceof ApiFault) {
+                ExceptionCode code = ((ApiFault) cur).getExceptionCode();
+                if (code != null && "INVALID_SESSION_ID".equals(code.toString())) {
+                    return true;
+                }
+            }
+            if (cur instanceof AsyncApiException
+                    && ((AsyncApiException) cur).getExceptionCode() == AsyncExceptionCode.InvalidSessionId) {
+                return true;
+            }
+            if (cur.getMessage() != null && cur.getMessage().contains("INVALID_SESSION_ID")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // With JWT Bearer the access token can be re-minted without a user, so an expired session is not fatal.
+    private boolean renewJwtSessionIfExpired(Exception e, int numAttempts) {
+        if (!isSessionExpired(e) || !JwtBearerLogin.isConfigured(controller.getAppConfig())) {
+            return false;
+        }
+        if (controller.getAppConfig().getOperationInfo() == OperationInfo.insert) {
+            // part of the batch may already be committed, so re-running could create duplicates
+            logger.error("The Salesforce session expired during an insert. Not retrying automatically to avoid duplicate records;"
+                    + " check the success file and re-run the remaining rows.");
+            return false;
+        }
+        if (!this.enableRetries || numAttempts >= this.maxRetries - 1) {
+            return false;
+        }
+        try {
+            logger.warn("The Salesforce session expired. Requesting a new access token with JWT Bearer and retrying.");
+            controller.renewJwtSession();
+            return true;
+        } catch (Exception renewFailure) {
+            logger.error("Could not renew the session: " + renewFailure.getMessage());
+            return false;
+        }
+    }
+
     private boolean shouldRetryOperation(Exception e, int numAttempts) {
+        if (renewJwtSessionIfExpired(e, numAttempts)) {
+            return true;
+        }
         if (e instanceof HttpClientTransportException
                 || e instanceof ExtractExceptionOnServer
                 || e instanceof LoadExceptionOnServer

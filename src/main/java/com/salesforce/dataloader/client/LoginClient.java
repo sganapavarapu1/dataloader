@@ -240,7 +240,33 @@ public class LoginClient extends ClientBase<PartnerConnection> {
         if (userInfo == null) {
             userInfo = conn.getUserInfo(); // check to make sure we have a good connection
         }
-        loginSuccess(conn, getAuthenticationHostDomainUrl(appConfig.getAuthEndpointForCurrentEnv()), userInfo);
+        // an OAuth token is only valid on the instance that issued it, so Bulk/REST calls must go there
+        // and not to the login host
+        String server = getSessionServerFromInstanceUrl(appConfig.getString(AppConfig.PROP_OAUTH_INSTANCE_URL));
+        if (server == null) {
+            server = getAuthenticationHostDomainUrl(appConfig.getAuthEndpointForCurrentEnv());
+        }
+        loginSuccess(conn, server, userInfo);
+    }
+
+    /**
+     * @return scheme://authority of the instance URL, or null if it is not a valid http(s) URL
+     *         (the property's default value is the string "false")
+     */
+    static String getSessionServerFromInstanceUrl(String instanceUrl) {
+        if (instanceUrl == null || instanceUrl.isBlank()) {
+            return null;
+        }
+        try {
+            URL url = URI.create(instanceUrl.trim()).toURL();
+            String protocol = url.getProtocol();
+            if (!"https".equals(protocol) && !"http".equals(protocol)) {
+                return null;
+            }
+            return protocol + "://" + url.getAuthority();
+        } catch (MalformedURLException | IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private void loginInternal(final PartnerConnection conn) throws ConnectionException, PasswordExpiredException {

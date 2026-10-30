@@ -44,6 +44,8 @@ import com.salesforce.dataloader.util.DLLogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.InitializingBean;
 import com.salesforce.dataloader.oauth.OAuthFlowHandler;
+import com.salesforce.dataloader.oauth.jwt.JwtBearerException;
+import com.salesforce.dataloader.oauth.jwt.JwtBearerLogin;
 
 import java.io.IOException;
 import java.util.Calendar;
@@ -114,14 +116,26 @@ public class ProcessRunner implements InitializingBean, IProcess {
         }
     }
 
-    private void handleOAuthLogin(AppConfig appConfig) throws OAuthBrowserLoginRunnerException {
-        if (requiresOAuthLogin(appConfig)) {
+    private void handleOAuthLogin(AppConfig appConfig) throws OAuthBrowserLoginRunnerException, JwtBearerException {
+        if (JwtBearerLogin.isConfigured(appConfig)) {
+            JwtBearerLogin.forConfig(appConfig).authenticate();
+        } else if (requiresOAuthLogin(appConfig)) {
         	doBrowserLogin(appConfig);
         }
     }
 
-    private boolean requiresOAuthLogin(AppConfig appConfig) {
-        return !(appConfig.contains(AppConfig.PROP_USERNAME) && appConfig.contains(AppConfig.PROP_PASSWORD));
+    // Browser (PKCE) login is the last resort: skip it when a password, an access token
+    // or JWT Bearer settings can authenticate the run without a browser.
+    static boolean requiresOAuthLogin(AppConfig appConfig) {
+        if (appConfig.contains(AppConfig.PROP_USERNAME) && appConfig.contains(AppConfig.PROP_PASSWORD)) {
+            return false;
+        }
+        return isBlank(appConfig.getString(AppConfig.PROP_OAUTH_ACCESSTOKEN))
+                && isBlank(appConfig.getString(AppConfig.PROP_OAUTH_JWT_KEYFILE));
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void setThreadNameIfNeeded(AppConfig appConfig) {
